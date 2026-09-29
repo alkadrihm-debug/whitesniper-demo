@@ -13,7 +13,8 @@ permissions: {}
 
 jobs:
   whitesniper:
-    name: WhiteSniper
+    # The Action publishes its own check run named "WhiteSniper"; the job is named apart from it.
+    name: Scan, verify, and publish
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -38,8 +39,23 @@ jobs:
       # (.github/actions/whitesniper) and its packed CLI (vendor/whitesniper) instead of
       # `uses: <owner>/WhiteSniper@<commit-sha>` and `version:`.
       - name: WhiteSniper
+        id: whitesniper
         uses: ./.github/actions/whitesniper
         with:
           packages-dir: vendor/whitesniper
           exclude: vendor
           build: npx --yes --package typescript@6.0.3 tsc -p tsconfig.json
+
+      # Anyone can check the signed Change Evidence this way: against Sigstore's trusted root,
+      # issued to a workflow of this repository, and about the commit that was verified.
+      - name: Check the signed evidence
+        if: ${{ !cancelled() && steps.whitesniper.outputs.cli != '' }}
+        env:
+          WS: ${{ steps.whitesniper.outputs.cli }}
+          OUT: ${{ steps.whitesniper.outputs.report-dir }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          if [ ! -f "$OUT/change-evidence.sigstore.json" ]; then echo "No signed evidence in this run."; exit 0; fi
+          node "$WS" bundle verify "$OUT/change-evidence.sigstore.json" --repository "$REPOSITORY" \
+            --commit "$COMMIT" --evidence-dir "$OUT/evidence"

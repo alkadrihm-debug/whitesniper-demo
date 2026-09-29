@@ -93,6 +93,11 @@ outputs:
   report-dir:
     description: Directory with report.json, report.sarif, report.md, report.html, and on pull requests verify.json.
     value: ${{ steps.prepare.outputs.dir }}/out
+  cli:
+    description: >-
+      Path to the installed WhiteSniper CLI (run it with node), for later steps such as checking the signed evidence
+      with bundle verify.
+    value: ${{ steps.prepare.outputs.ws }}
 
 runs:
   using: composite

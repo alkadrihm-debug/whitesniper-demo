@@ -1,5 +1,5 @@
 async function fetchData(url: string): Promise<any> {
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   return response.json();
 }
 

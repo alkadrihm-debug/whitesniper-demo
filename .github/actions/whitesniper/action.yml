@@ -1,0 +1,168 @@
+name: WhiteSniper Verify
+description: >-
+  Scan a repository or pull request with WhiteSniper, verify the change against its base, and publish the
+  results: one pull-request comment updated in place, a check run with line annotations, SARIF for code
+  scanning, and a Change Evidence artifact (signed keylessly on public repositories).
+author: WhiteSniper
+branding:
+  icon: shield
+  color: gray-dark
+
+inputs:
+  version:
+    description: Version of @whitesniper/cli to install from npm. Set exactly one of version, packages-dir, or cli-path.
+    required: false
+    default: ""
+  packages-dir:
+    description: Directory of WhiteSniper package tarballs (pnpm pack) to install instead of npm, for pre-release testing.
+    required: false
+    default: ""
+  cli-path:
+    description: Path to an already built WhiteSniper CLI (packages/cli/dist/bin.js), for WhiteSniper's own CI.
+    required: false
+    default: ""
+  fail-on:
+    description: Lowest severity of a new finding that fails the job (critical, high, medium, low, info, or none).
+    required: false
+    default: high
+  trust:
+    description: >-
+      auto (default) runs engines that execute repository code (ESLint, Pyright) except on pull requests from
+      forks; trusted or untrusted forces either.
+    required: false
+    default: auto
+  offline:
+    description: true skips engines that send data off the runner (OSV-Scanner, the dependency gate).
+    required: false
+    default: "false"
+  build:
+    description: Build commands for verification, one per line, run without a shell.
+    required: false
+    default: ""
+  test:
+    description: Test commands for verification, one per line, run without a shell.
+    required: false
+    default: ""
+  exclude:
+    description: Repository paths to leave out, one per line.
+    required: false
+    default: ""
+  comment:
+    description: Keep one pull-request comment updated with the results (needs pull-requests write).
+    required: false
+    default: "true"
+  check-run:
+    description: Publish a check run with annotations on the exact lines (needs checks write).
+    required: false
+    default: "true"
+  upload-sarif:
+    description: >-
+      auto (default) uploads SARIF to code scanning on public repositories; true or false forces it (needs
+      security-events write; private repositories need GitHub Code Security).
+    required: false
+    default: auto
+  sign:
+    description: >-
+      auto (default) signs the Change Evidence keylessly on public repositories; keyless also signs on a private
+      repository, which records its name and workflow in Sigstore's public transparency log; none never signs.
+      Keyless signing needs id-token write.
+    required: false
+    default: auto
+  evidence-artifact:
+    description: Name of the artifact that holds the reports and the evidence.
+    required: false
+    default: whitesniper-evidence
+  github-token:
+    description: Token for the comment and the check run.
+    required: false
+    default: ${{ github.token }}
+  comment-author:
+    description: >-
+      Login that writes the pull-request comment, so the Action updates its own comment in place. Set it when
+      github-token belongs to another identity (a GitHub App is "<app-slug>[bot]").
+    required: false
+    default: github-actions[bot]
+
+outputs:
+  gate:
+    description: passed or failed.
+    value: ${{ steps.scan.outputs.gate }}
+  outcome:
+    description: The verification outcome on pull requests (verified, failed, or inconclusive), else empty.
+    value: ${{ steps.scan.outputs.outcome }}
+  report-dir:
+    description: Directory with report.json, report.sarif, report.md, report.html, and on pull requests verify.json.
+    value: ${{ steps.prepare.outputs.dir }}/out
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare WhiteSniper
+      id: prepare
+      shell: bash
+      env:
+        WS_VERSION: ${{ inputs.version }}
+        WS_PACKAGES_DIR: ${{ inputs.packages-dir }}
+        WS_CLI_PATH: ${{ inputs.cli-path }}
+        WS_TRUST: ${{ inputs.trust }}
+        WS_SIGN: ${{ inputs.sign }}
+        WS_UPLOAD_SARIF: ${{ inputs.upload-sarif }}
+        WS_EVENT_NAME: ${{ github.event_name }}
+        WS_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        WS_REPOSITORY: ${{ github.repository }}
+        WS_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+      run: bash "$GITHUB_ACTION_PATH/action/prepare.sh"
+
+    - name: Scan and verify
+      id: scan
+      shell: bash
+      env:
+        WS: ${{ steps.prepare.outputs.ws }}
+        WS_DIR: ${{ steps.prepare.outputs.dir }}
+        WS_TRUST_FLAG: ${{ steps.prepare.outputs.trust-flag }}
+        WS_SIGN: ${{ steps.prepare.outputs.sign }}
+        WS_FAIL_ON: ${{ inputs.fail-on }}
+        WS_OFFLINE: ${{ inputs.offline }}
+        WS_BUILD: ${{ inputs.build }}
+        WS_TEST: ${{ inputs.test }}
+        WS_EXCLUDE: ${{ inputs.exclude }}
+        WS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      run: bash "$GITHUB_ACTION_PATH/action/scan.sh"
+
+    - name: Upload SARIF to code scanning
+      id: sarif
+      if: steps.prepare.outputs.upload-sarif == 'true'
+      continue-on-error: true
+      uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+      with:
+        sarif_file: ${{ steps.prepare.outputs.dir }}/out/report.sarif
+        category: whitesniper
+
+    - name: Upload evidence
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.evidence-artifact }}
+        path: ${{ steps.prepare.outputs.dir }}/out
+        if-no-files-found: warn
+        retention-days: 30
+
+    - name: Publish results
+      shell: bash
+      env:
+        WS: ${{ steps.prepare.outputs.ws }}
+        WS_DIR: ${{ steps.prepare.outputs.dir }}
+        WS_SIGNED: ${{ steps.scan.outputs.signed }}
+        WS_SARIF_UPLOADED: ${{ steps.sarif.outcome == 'success' }}
+        WS_COMMENT: ${{ inputs.comment }}
+        WS_CHECK_RUN: ${{ inputs.check-run }}
+        WS_ARTIFACT: ${{ inputs.evidence-artifact }}
+        WS_COMMENT_AUTHOR: ${{ inputs.comment-author }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: bash "$GITHUB_ACTION_PATH/action/publish.sh"
+
+    - name: Gate
+      shell: bash
+      env:
+        WS_GATE: ${{ steps.scan.outputs.gate }}
+        WS_OUTCOME: ${{ steps.scan.outputs.outcome }}
+      run: bash "$GITHUB_ACTION_PATH/action/gate.sh"

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "0.1.0",
+  "createdAt": "2026-09-29T05:24:35.173Z",
+  "tool": {
+    "name": "whitesniper",
+    "version": "0.1.0"
+  },
+  "fingerprints": [
+    "56defbe3995a4eab2ba11d419a18f9aad51217585c610f7bca5676e6907f77b9",
+    "6666788a5fd53b67e8f81923707965041c0db7586e97be9220402fe916d7e068",
+    "868743d5c90d19689f0fe617233c7e9d6de441cf23b99f35fa8ea057fe9a7cc8",
+    "d8bde0856ebc3ae612bcf1c0034d144a10dd05601805acde7c0dc3e516a1cb04"
+  ],
+  "entries": [
+    {
+      "fingerprint": "56defbe3995a4eab2ba11d419a18f9aad51217585c610f7bca5676e6907f77b9",
+      "engineId": "whitesniper-standards",
+      "path": "package.json"
+    },
+    {
+      "fingerprint": "6666788a5fd53b67e8f81923707965041c0db7586e97be9220402fe916d7e068",
+      "engineId": "whitesniper-standards",
+      "path": "SECURITY.md"
+    },
+    {
+      "fingerprint": "868743d5c90d19689f0fe617233c7e9d6de441cf23b99f35fa8ea057fe9a7cc8",
+      "engineId": "whitesniper-standards",
+      "path": "package.json"
+    },
+    {
+      "fingerprint": "d8bde0856ebc3ae612bcf1c0034d144a10dd05601805acde7c0dc3e516a1cb04",
+      "engineId": "whitesniper-standards",
+      "path": "LICENSE"
+    }
+  ]
+}

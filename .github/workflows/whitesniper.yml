@@ -1,0 +1,39 @@
+name: WhiteSniper
+
+on:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  whitesniper:
+    name: WhiteSniper
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read # check out the code
+      pull-requests: write # the pull-request comment
+      checks: write # the check run with annotations
+      security-events: write # upload SARIF to code scanning
+      id-token: write # keyless signing of the Change Evidence
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the base commit, to verify the change against it
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      # WhiteSniper is private until its release, so this demo carries a copy of its Action
+      # (.github/actions/whitesniper) and its packed CLI (vendor/whitesniper) instead of
+      # `uses: <owner>/WhiteSniper@<commit-sha>` and `version:`.
+      - name: WhiteSniper
+        uses: ./.github/actions/whitesniper
+        with:
+          packages-dir: vendor/whitesniper
+          exclude: vendor
+          build: npx --yes --package typescript@6.0.3 tsc -p tsconfig.json

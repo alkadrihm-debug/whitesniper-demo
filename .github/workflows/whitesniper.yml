@@ -3,6 +3,12 @@ name: WhiteSniper
 on:
   pull_request:
 
+# One run per pull request at a time: a newer push cancels the older run, so two runs never
+# race to create the pull-request comment.
+concurrency:
+  group: whitesniper-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 permissions: {}
 
 jobs:
